@@ -7,15 +7,13 @@ that allows clients to connect and broadcast messages to all connected clients.
 import asyncio
 import websockets
 import argparse
-import signal
 import sys
-import os
 from datetime import datetime
 from typing import Set
 
-# Render Deployment Fix
+# Default configuration
 DEFAULT_HOST = "0.0.0.0"
-DEFAULT_PORT = int(os.environ.get("PORT", 8765))
+DEFAULT_PORT = 8765
 
 # Store all connected clients
 connected_clients: Set[websockets.WebSocketServerProtocol] = set()
@@ -85,7 +83,7 @@ class BroadcastServer:
 
         self.server = await websockets.serve(self.handler, self.host, self.port)
 
-        print(f"[{self._timestamp()}] Server is running. Waiting for clients...")
+        print(f"[{self._timestamp()}] Server is running. Waiting for clients to connect...")
         print(f"[{self._timestamp()}] Press Ctrl+C to stop the server")
 
         await asyncio.Future()  # Run forever
@@ -114,9 +112,13 @@ class BroadcastServer:
 class BroadcastClient:
     """WebSocket client that can connect to the broadcast server."""
 
-    def __init__(self, host: str, port: int, secure: bool = False):
-        protocol = "wss" if secure else "ws"
-        self.uri = f"{protocol}://{host}:{port}"
+    def __init__(self, host: str = "localhost", port: int = DEFAULT_PORT):
+        # If connecting to Render domain, use wss
+        if host.endswith(".onrender.com"):
+            self.uri = f"wss://{host}"
+        else:
+            self.uri = f"ws://{host}:{port}"
+
         self.websocket = None
         self.running = False
 
@@ -147,7 +149,7 @@ class BroadcastClient:
         except websockets.exceptions.WebSocketException as e:
             print(f"[{self._timestamp()}] WebSocket error: {e}")
         except ConnectionRefusedError:
-            print(f"[{self._timestamp()}] Could not connect to server.")
+            print(f"[{self._timestamp()}] Could not connect to server. Make sure the server is running.")
         except Exception as e:
             print(f"[{self._timestamp()}] Error: {e}")
         finally:
@@ -161,7 +163,7 @@ class BroadcastClient:
                 print(f"\n{message}")
                 print("> ", end="", flush=True)
         except websockets.exceptions.ConnectionClosed:
-            print(f"\n[{self._timestamp()}] Connection lost")
+            print(f"\n[{self._timestamp()}] Connection to server lost")
         except Exception as e:
             print(f"\n[{self._timestamp()}] Error receiving message: {e}")
 
@@ -180,6 +182,7 @@ class BroadcastClient:
             print(f"\n[{self._timestamp()}] Error sending message: {e}")
 
     def _get_input(self):
+        """Get input from user."""
         try:
             return input("> ")
         except EOFError:
@@ -205,9 +208,9 @@ async def start_server(host: str, port: int):
         await server.stop()
 
 
-async def connect_client(host: str, port: int, secure: bool):
+async def connect_client(host: str, port: int):
     """Connect to the broadcast server as a client."""
-    client = BroadcastClient(host, port, secure)
+    client = BroadcastClient(host, port)
 
     try:
         await client.connect()
@@ -216,6 +219,7 @@ async def connect_client(host: str, port: int, secure: bool):
 
 
 def main():
+    """Main entry point for the CLI."""
     parser = argparse.ArgumentParser(
         description="Broadcast Server - Real-time WebSocket message broadcasting",
         formatter_class=argparse.RawDescriptionHelpFormatter,
@@ -224,7 +228,7 @@ Examples:
   python broadcast_server.py start
   python broadcast_server.py start --port 9000
   python broadcast_server.py connect --host localhost --port 8765
-  python broadcast_server.py connect --host your-render-app.onrender.com --port 443 --secure
+  python broadcast_server.py connect --host broadcast-chat-server.onrender.com --port 443
         """
     )
 
@@ -236,30 +240,24 @@ Examples:
 
     parser.add_argument(
         "--host",
-        default=DEFAULT_HOST,
-        help=f"Host address (default: {DEFAULT_HOST})"
+        default="localhost",
+        help="Host address"
     )
 
     parser.add_argument(
         "--port",
         type=int,
         default=DEFAULT_PORT,
-        help=f"Port number (default: {DEFAULT_PORT})"
-    )
-
-    parser.add_argument(
-        "--secure",
-        action="store_true",
-        help="Use secure WebSocket connection (wss://)"
+        help="Port number"
     )
 
     args = parser.parse_args()
 
     if args.command == "start":
-        asyncio.run(start_server(args.host, args.port))
+        asyncio.run(start_server(DEFAULT_HOST, args.port))
 
     elif args.command == "connect":
-        asyncio.run(connect_client(args.host, args.port, args.secure))
+        asyncio.run(connect_client(args.host, args.port))
 
 
 if __name__ == "__main__":
