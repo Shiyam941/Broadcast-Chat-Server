@@ -3,7 +3,7 @@
 A WebSocket broadcast server with both **GUI and CLI interfaces** that allows multiple clients to connect and broadcast messages in real-time. This project demonstrates how to work with WebSockets and implement real-time communication between clients and servers.
 
 ## 🎨 New! GUI Version Available
-
+Project URL : https://roadmap.sh/projects/broadcast-server
 This project now includes beautiful graphical user interfaces! Choose between:
 
 - **🖼️ GUI Mode** - Easy-to-use graphical interface (Recommended for beginners)
